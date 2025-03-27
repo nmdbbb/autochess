@@ -1,0 +1,19 @@
+model:
+  input_planes: 119         # số chiều đầu vào (encoding của bàn cờ)
+  channels: 256             # số channels trong các layer
+  residual_blocks: 10       # số block residual
+
+training:
+  batch_size: 256
+  learning_rate: 0.01
+  weight_decay: 1e-4
+
+mcts:
+  simulations: 400
+  cpuct: 1.5
+  temperature: 1.0
+  dirichlet_alpha: 0.3
+
+selfplay:
+  games_per_iteration: 100
+  max_moves: 512

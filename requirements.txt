@@ -1,0 +1,7 @@
+numpy
+torch
+tqdm
+matplotlib
+python-chess
+PyYAML
+flask

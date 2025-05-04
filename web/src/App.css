@@ -1,0 +1,102 @@
+.App {
+  text-align: center;
+  min-height: 100vh;
+  background-color: #282c34;
+  color: white;
+}
+
+.App-header {
+  padding: 20px;
+  background-color: #1a1d24;
+}
+
+.game-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 40px;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.board-container {
+  flex: 0 0 auto;
+}
+
+.controls {
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+  background-color: #1a1d24;
+  border-radius: 8px;
+}
+
+.color-selector {
+  display: flex;
+  gap: 10px;
+}
+
+.color-selector button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 4px;
+  background-color: #3a3f4b;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.color-selector button.active {
+  background-color: #4a90e2;
+}
+
+.color-selector button:hover {
+  background-color: #4a90e2;
+}
+
+.game-info {
+  text-align: left;
+  padding: 15px;
+  background-color: #2a2f3a;
+  border-radius: 4px;
+}
+
+.game-info p {
+  margin: 5px 0;
+}
+
+.ai-move {
+  padding: 12px;
+  border: none;
+  border-radius: 4px;
+  background-color: #4a90e2;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.ai-move:hover {
+  background-color: #357abd;
+}
+
+.ai-move:disabled {
+  background-color: #3a3f4b;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .game-container {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .controls {
+    width: 100%;
+    max-width: 600px;
+  }
+} 

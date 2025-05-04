@@ -1,0 +1,63 @@
+# Model Configuration
+model:
+  hidden_size: 768
+  num_layers: 12
+  num_heads: 12
+  dropout: 0.1
+
+# Training Configuration
+training:
+  num_iterations: 1000
+  num_games_per_iteration: 100
+  batch_size: 32
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  gradient_clip: 1.0
+
+# MCTS Configuration
+mcts:
+  num_simulations: 800
+  c_puct: 1.0
+  dirichlet_alpha: 0.3
+  dirichlet_epsilon: 0.25
+
+# Self-Play Configuration
+self_play:
+  max_moves: 200
+  replay_buffer_size: 1000000
+  temperature: 1.0
+  temperature_decay: 0.99
+
+# Distributed Training
+distributed:
+  num_workers: 4
+  ray:
+    redis_address: "localhost:6379"
+    redis_password: ""
+    object_store_memory: 1000000000
+    num_cpus: 8
+    num_gpus: 1
+
+# Evaluation
+evaluation:
+  num_games: 100
+  stockfish_depth: 20
+  stockfish_time: 1.0
+  evaluation_interval: 10
+
+# Checkpointing
+checkpoint:
+  save_interval: 10
+  max_to_keep: 5
+  checkpoint_dir: "checkpoints"
+
+# Logging
+logging:
+  tensorboard_dir: "runs"
+  log_interval: 100
+  metrics:
+    - "policy_loss"
+    - "value_loss"
+    - "replay_buffer_size"
+    - "win_rate"
+    - "elo_rating" 

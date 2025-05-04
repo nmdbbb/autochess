@@ -1,97 +1,180 @@
-# 📘 Mô tả Dự án: AlphaZero-Chess (Transformer + Distributed RL)
 
-## 🎯 Tên dự án:
-**AlphaZero-Chess — Xây dựng AI học chơi cờ vua bằng Reinforcement Learning phân tán với Transformer**
+## AlphaZero Chess Implementation
 
-## 💡 Mục tiêu chính:
-- Xây dựng một mô hình AI có khả năng **tự học chơi cờ vua từ đầu** mà không cần dữ liệu con người.
-- Mô phỏng cách hoạt động của **AlphaZero** của DeepMind:
-  - Kết hợp **Monte Carlo Tree Search (MCTS)** với mạng nơ-ron sâu **Transformer**, thay thế ResNet truyền thống.
-  - Học chiến lược hoàn toàn qua **self-play**.
-  - Huấn luyện song song và phân tán bằng **Ray RLlib** hoặc **PyTorch DDP**.
-- Đánh giá bằng cách thi đấu với các engine như Stockfish.
-- Hỗ trợ giao diện người dùng Web + CLI để tương tác với AI.
+A PyTorch implementation of the AlphaZero algorithm for chess, featuring a transformer-based architecture, MCTS search, and distributed training capabilities.
 
-## 🧠 Ý tưởng chính
-1. AI bắt đầu từ trắng tay, không có dữ liệu con người.
-2. Dùng Transformer để ước lượng xác suất nước đi (policy) và khả năng thắng (value).
-3. MCTS sử dụng thông tin từ Transformer để duyệt cây.
-4. Self-play sinh dữ liệu (s, π, z) liên tục.
-5. Toàn bộ pipeline huấn luyện và sinh dữ liệu được phân tán để tăng tốc.
+## Project Overview
 
-## ⚙️ Kiến trúc hệ thống
-```
-[Web UI / CLI] ─▶ [REST API Flask] ─▶ [Self-Play Worker] ─▶ [Transformer + MCTS Engine]
-                                          │
-                                          ▼
-                             [Replay Buffer Distributed]
-                                          │
-                                          ▼
-                           [Trainer Node - Distributed GPUs]
-```
+This project implements the AlphaZero algorithm for chess, using modern deep learning techniques and a transformer-based neural network. The implementation includes:
 
-## 🧩 Thành phần và công nghệ
-| Thành phần       | Công nghệ sử dụng                     |
-|------------------|----------------------------------------|
-| Neural Network   | PyTorch, Transformer Encoder-Only      |
-| Self-Play Engine | MCTS C++, Python, Ray Actor            |
-| Luật chơi        | python-chess hoặc C++ Custom Engine    |
-| Distributed RL   | Ray RLlib / PyTorch Lightning + DDP    |
-| REST API         | Flask, FastAPI                         |
-| UI               | ReactJS + TypeScript                   |
-| DevOps           | Docker, docker-compose, GitHub Actions|
+- Transformer-based policy and value network
+- Monte Carlo Tree Search (MCTS) for move selection
+- Self-play training pipeline
+- Distributed training support
+- Web-based UI for playing against the trained model
 
-## 📦 Cấu trúc thư mục
+## Project Structure
+
 ```
 alphazero-chess/
-├── models/              # Mạng Transformer + weight loader
-├── mcts/                # MCTS Engine viết bằng C++ / Python
-├── selfplay/            # Ray Actor chạy tự chơi và sinh dữ liệu
-├── train/               # Trainer dùng DDP hoặc RLlib
-├── backend/             # REST API Flask
-├── web/                 # React Frontend
-├── config/              # YAML cấu hình pipeline
-├── distributed/         # Script chạy cluster phân tán
-├── data/                # Replay buffer, checkpoints
-├── evaluate.py          # So sánh với Stockfish
-├── play_cli.py          # Giao diện chơi bằng dòng lệnh
-└── docker-compose.yml   # Triển khai toàn bộ stack
+├── config/               # Configuration files
+│   └── training_config.yaml
+├── models/              # Neural network architecture
+│   └── transformer.py
+├── mcts/               # Monte Carlo Tree Search implementation
+│   └── mcts.py
+├── selfplay/           # Self-play and game state management
+│   └── game_state.py
+├── utils/              # Utility functions
+│   └── board_encoding.py
+├── train/              # Training pipeline
+├── distributed/        # Distributed training components
+├── web/               # Web interface
+├── backend/           # API backend
+├── tests/             # Unit and integration tests
+├── checkpoints/       # Model checkpoints
+└── runs/              # Training logs and metrics
 ```
 
-## 🧪 Testing
-The project includes comprehensive tests to ensure functionality:
-- Unit tests for individual components
-- Integration tests for MCTS and self-play
-- End-to-end tests for the complete pipeline
+## Requirements
 
-To run tests:
+- Python 3.8+
+- PyTorch 2.0+
+- python-chess
+- PyYAML
+- Additional dependencies in requirements.txt
+
+## Installation
+
+1. Clone the repository:
 ```bash
-python -m pytest tests/ -v
+git clone https://github.com/nmdbbb/autochess.git
+cd autochess
 ```
 
-Key test files:
-- `tests/test_end_to_end.py`: Tests the complete pipeline
-- `tests/test_selfplay_loop.py`: Tests self-play functionality
-- `tests/test_mcts_simulation.py`: Tests MCTS implementation
-- `tests/test_model_forward.py`: Tests neural network forward pass
+2. Create and activate a virtual environment (optional but recommended):
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-## ⚡ Cấu hình đề xuất
-| Hạng mục        | Tối thiểu         | Khuyến nghị chuyên sâu |
-|-----------------|-------------------|--------------------------|
-| GPU             | RTX 3060 12GB     | A100 40GB × N (multi-GPU) |
-| CPU             | 8 cores           | ≥32 cores (Ray cluster)  |
-| RAM             | 16 GB             | ≥64 GB                   |
-| Lưu trữ         | 100GB SSD         | ≥1TB NVMe                |
-| Network         | -                 | 1Gbps LAN nếu chạy phân tán |
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-## 🔄 Development Status
-- [x] Basic project structure
-- [x] Transformer model implementation
-- [x] MCTS implementation
-- [x] Self-play loop
-- [x] Board encoding
-- [x] Basic testing framework
-- [ ] Distributed training
-- [ ] Web interface
-- [ ] Stockfish evaluation
-- [ ] Performance optimization
+## Usage
+
+### Training
+
+1. Configure training parameters in `config/training_config.yaml`
+2. Start training:
+```bash
+python -m train.train
+```
+
+For distributed training:
+```bash
+docker-compose up
+```
+
+### Playing Against the Model
+
+1. Start the web interface:
+```bash
+python -m web.app
+```
+
+2. Open a browser and navigate to `http://localhost:8000`
+
+### Evaluating Model Strength
+
+Run evaluation against other chess engines:
+```bash
+python evaluate.py --model-path checkpoints/best_model.pt
+```
+
+### Running Tests
+
+Run all tests:
+```bash
+python -m pytest tests/
+```
+
+Run specific test files:
+```bash
+python -m pytest tests/test_selfplay_loop.py -v
+```
+
+## Model Architecture
+
+The implementation uses a transformer-based architecture:
+
+- Input: 119-channel 8x8 board representation
+  - Current position (48 planes)
+  - Previous position (48 planes)
+  - Metadata planes (repetition count, move count, etc.)
+- Transformer encoder with self-attention
+- Dual head output:
+  - Policy head: 4672 move probabilities
+  - Value head: Game outcome prediction [-1, 1]
+
+## Training Pipeline
+
+The training process follows the AlphaZero methodology:
+
+1. Self-play data generation
+   - MCTS with 800 simulations per move
+   - Temperature-based exploration
+   - Position and game outcome recording
+
+2. Neural network training
+   - Policy loss (cross-entropy)
+   - Value loss (MSE)
+   - L2 regularization
+
+3. Model evaluation
+   - Comparison with previous versions
+   - ELO rating tracking
+
+## Configuration
+
+Key parameters in `config/training_config.yaml`:
+
+```yaml
+model:
+  d_model: 256
+  num_layers: 6
+  nhead: 8
+  dim_feedforward: 1024
+  dropout: 0.1
+
+mcts:
+  simulations: 800
+  cpuct: 1.0
+  
+training:
+  batch_size: 2048
+  epochs: 100
+  learning_rate: 0.001
+  weight_decay: 1e-4
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- DeepMind's AlphaZero papers
+- The python-chess library
+- The PyTorch team and community
+
+## References
+
+1. Silver, D., et al. (2017). Mastering Chess and Shogi by Self-Play with a General Reinforcement Learning Algorithm
+2. Silver, D., et al. (2018). A general reinforcement learning algorithm that masters chess, shogi, and Go through self-play

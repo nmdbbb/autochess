@@ -6,7 +6,7 @@ class GameState:
     def __init__(self):
         self.board = chess.Board()
         self.move_history = []
-        self.position_history = []
+        self.position_history = [self.board.copy()]  # Initialize with starting position
         self.repetitions = {}
         self._update_repetitions()
     

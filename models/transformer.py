@@ -1,69 +1,140 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import BertConfig, BertModel
 
-class ChessTransformer(nn.Module):
-    def __init__(self, hidden_size=768, num_layers=12, num_heads=12, dropout=0.1):
+class TransformerEncoder(nn.Module):
+    def __init__(self, hidden_size, num_layers, num_heads, dropout):
         super().__init__()
         
-        # Chess board representation: 8x8x12 (pieces) + 1 (color) = 769
-        self.input_embedding = nn.Linear(769, hidden_size)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=hidden_size,
+            nhead=num_heads,
+            dim_feedforward=hidden_size * 4,
+            dropout=dropout,
+            batch_first=True
+        )
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+
+    def forward(self, x, mask=None):
+        return self.transformer(x, mask)
+
+class ChessTransformer(nn.Module):
+    def __init__(self, d_model=256, num_layers=6, num_heads=8, dim_feedforward=1024, dropout=0.1):
+        super().__init__()
         
-        # Transformer configuration
-        config = BertConfig(
-            hidden_size=hidden_size,
-            num_hidden_layers=num_layers,
-            num_attention_heads=num_heads,
-            intermediate_size=hidden_size * 4,
-            hidden_dropout_prob=dropout,
-            attention_probs_dropout_prob=dropout,
-            max_position_embeddings=64,  # 8x8 board
+        # Input dimensions
+        self.input_channels = 119  # AlphaZero-style input planes
+        self.board_size = 8
+        self.d_model = d_model
+        
+        # Patch embedding (each square is a patch)
+        self.patch_embedding = nn.Linear(self.input_channels, d_model)
+        
+        # Learnable position embeddings (8x8 board = 64 positions)
+        self.pos_embed = nn.Parameter(torch.randn(1, 64, d_model))
+        
+        # Layer normalization before transformer
+        self.input_norm = nn.LayerNorm(d_model)
+        
+        # Transformer encoder
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=num_heads,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+            activation='gelu',
+            batch_first=True
+        )
+        self.transformer = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=num_layers
         )
         
-        self.transformer = BertModel(config)
-        
-        # Policy head: predicts move probabilities
-        self.policy_head = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.ReLU(),
-            nn.Linear(hidden_size, 4672)  # All possible chess moves
-        )
-        
-        # Value head: predicts game outcome
+        # Value head
         self.value_head = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, 128),
             nn.ReLU(),
-            nn.Linear(hidden_size, 1),
-            nn.Tanh()  # Output between -1 and 1
+            nn.Linear(128, 1),
+            nn.Tanh()
         )
+        
+        # Policy head
+        self.policy_head = nn.Sequential(
+            nn.LayerNorm(d_model),
+            nn.Linear(d_model, 4672)  # Full chess move space
+        )
+        
+        # Dropout
+        self.dropout = nn.Dropout(dropout)
     
-    def forward(self, board_state):
-        # board_state: [batch_size, 8, 8, 13]
-        batch_size = board_state.size(0)
+    def forward(self, x):
+        # x shape: [batch_size, 119, 8, 8]
+        batch_size = x.size(0)
         
-        # Flatten the board state
-        x = board_state.view(batch_size, -1)
+        # Reshape input to [batch_size, 64, 119]
+        # Each square becomes a token with 119 channels
+        x = x.permute(0, 2, 3, 1)  # [batch_size, 8, 8, 119]
+        x = x.reshape(batch_size, 64, self.input_channels)
         
-        # Input embedding
-        x = self.input_embedding(x)
+        # Patch embedding
+        x = self.patch_embedding(x)  # [batch_size, 64, d_model]
         
         # Add position embeddings
-        position_ids = torch.arange(64, device=x.device).unsqueeze(0).expand(batch_size, -1)
-        x = x.view(batch_size, 64, -1)  # Reshape for transformer
+        x = x + self.pos_embed
         
-        # Transformer
-        transformer_output = self.transformer(
-            inputs_embeds=x,
-            position_ids=position_ids,
-            return_dict=True
-        )
+        # Layer normalization and dropout
+        x = self.input_norm(x)
+        x = self.dropout(x)
         
-        # Get the [CLS] token output for value prediction
-        cls_output = transformer_output.last_hidden_state[:, 0]
+        # Transformer encoder
+        x = self.transformer(x)  # [batch_size, 64, d_model]
         
-        # Policy and value predictions
-        policy = self.policy_head(transformer_output.last_hidden_state.view(batch_size, -1))
-        value = self.value_head(cls_output)
+        # Global average pooling over squares for value head
+        x_pooled = x.mean(dim=1)  # [batch_size, d_model]
         
-        return policy, value 
+        # Value and policy predictions
+        value = self.value_head(x_pooled)  # [batch_size, 1]
+        value = value.squeeze(-1)  # [batch_size]
+        policy_logits = self.policy_head(x_pooled)  # [batch_size, 4672]
+        
+        return policy_logits, value
+
+def loss_function(policy_pred, policy_target, value_pred, value_target, model, weight_decay=1e-4):
+    """
+    Compute the combined loss for policy and value predictions
+    
+    Args:
+        policy_pred: predicted move logits [batch_size, 4672]
+        policy_target: target move probabilities [batch_size, 4672]
+        value_pred: predicted game outcome [batch_size]
+        value_target: target game outcome [batch_size]
+        model: the transformer model (for L2 regularization)
+        weight_decay: L2 regularization coefficient
+    """
+    # MSE loss for value head
+    value_loss = F.mse_loss(value_pred, value_target)
+    
+    # Cross entropy loss for policy head
+    # Use KL divergence since we have probability distributions
+    policy_loss = F.kl_div(
+        F.log_softmax(policy_pred, dim=-1),
+        policy_target,
+        reduction='batchmean'
+    )
+    
+    # L2 regularization
+    l2_loss = 0
+    for param in model.parameters():
+        l2_loss += torch.norm(param) ** 2
+    l2_loss *= weight_decay
+    
+    # Total loss
+    total_loss = value_loss + policy_loss + l2_loss
+    
+    return total_loss, {
+        'value_loss': value_loss.item(),
+        'policy_loss': policy_loss.item(),
+        'l2_loss': l2_loss.item(),
+        'total_loss': total_loss.item()
+    } 

@@ -58,6 +58,22 @@ alphazero-chess/
 └── docker-compose.yml   # Triển khai toàn bộ stack
 ```
 
+## 🧪 Testing
+The project includes comprehensive tests to ensure functionality:
+- Unit tests for individual components
+- Integration tests for MCTS and self-play
+- End-to-end tests for the complete pipeline
+
+To run tests:
+```bash
+python -m pytest tests/ -v
+```
+
+Key test files:
+- `tests/test_end_to_end.py`: Tests the complete pipeline
+- `tests/test_selfplay_loop.py`: Tests self-play functionality
+- `tests/test_mcts_simulation.py`: Tests MCTS implementation
+- `tests/test_model_forward.py`: Tests neural network forward pass
 
 ## ⚡ Cấu hình đề xuất
 | Hạng mục        | Tối thiểu         | Khuyến nghị chuyên sâu |
@@ -67,3 +83,15 @@ alphazero-chess/
 | RAM             | 16 GB             | ≥64 GB                   |
 | Lưu trữ         | 100GB SSD         | ≥1TB NVMe                |
 | Network         | -                 | 1Gbps LAN nếu chạy phân tán |
+
+## 🔄 Development Status
+- [x] Basic project structure
+- [x] Transformer model implementation
+- [x] MCTS implementation
+- [x] Self-play loop
+- [x] Board encoding
+- [x] Basic testing framework
+- [ ] Distributed training
+- [ ] Web interface
+- [ ] Stockfish evaluation
+- [ ] Performance optimization

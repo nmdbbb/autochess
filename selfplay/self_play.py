@@ -15,40 +15,64 @@ class SelfPlay:
 
     def _board_to_tensor(self, board: chess.Board) -> torch.Tensor:
         # Convert chess board to tensor representation
-        tensor = torch.zeros(8, 8, 13)
+        # Output shape: [119, 8, 8]
+        device = next(self.model.parameters()).device
+        tensor = torch.zeros(119, 8, 8, device=device)
         
-        for i in range(8):
-            for j in range(8):
-                square = chess.square(i, j)
-                piece = board.piece_at(square)
-                if piece:
-                    piece_type = piece.piece_type - 1
-                    color = 1 if piece.color else 0
-                    tensor[i, j, piece_type + (color * 6)] = 1
+        # Piece planes (12 pieces * 8 squares = 96 planes)
+        piece_idx = 0
+        for piece_type in range(1, 7):  # 1=pawn, 2=knight, ..., 6=king
+            for color in [True, False]:  # True=white, False=black
+                for rank in range(8):
+                    for file in range(8):
+                        square = chess.square(file, rank)
+                        piece = board.piece_at(square)
+                        if piece and piece.piece_type == piece_type and piece.color == color:
+                            tensor[piece_idx, rank, file] = 1
+                piece_idx += 1
         
-        tensor[:, :, 12] = 1 if board.turn else 0
+        # Additional features (23 planes)
+        # Repetition counters (2 planes)
+        tensor[96:98] = 0  # We don't track repetitions yet
+        
+        # Color (1 plane)
+        tensor[98].fill_(1 if board.turn else 0)
+        
+        # Total move count (1 plane)
+        tensor[99].fill_(board.fullmove_number)
+        
+        # Castling rights (4 planes)
+        tensor[100].fill_(board.has_kingside_castling_rights(chess.WHITE))
+        tensor[101].fill_(board.has_queenside_castling_rights(chess.WHITE))
+        tensor[102].fill_(board.has_kingside_castling_rights(chess.BLACK))
+        tensor[103].fill_(board.has_queenside_castling_rights(chess.BLACK))
+        
+        # No-progress count (1 plane)
+        tensor[104].fill_(board.halfmove_clock)
+        
+        # Remaining planes (14) set to 0 for now
+        # These could be used for additional features in the future
+        
         return tensor
 
     def _get_training_data(self, board: chess.Board, move: chess.Move) -> Tuple[torch.Tensor, np.ndarray, float]:
         # Get state representation
         state = self._board_to_tensor(board)
         
-        # Get policy from MCTS
-        root = self.mcts._select(self.mcts.Node(board))
-        self.mcts._expand(root)
+        # Get policy and value from MCTS
+        encoded_state = state.unsqueeze(0)  # Add batch dimension
+        move = self.mcts.search(board, encoded_state)
         
         # Create policy vector
         policy = np.zeros(4672)  # All possible chess moves
-        total_visits = sum(child.visit_count for child in root.children.values())
+        total_visits = sum(child.visit_count for child in self.mcts.root.children.values())
         
-        for child_move, child in root.children.items():
-            move_idx = child_move.from_square * 64 + child_move.to_square
+        for child_move, child in self.mcts.root.children.items():
+            move_idx = self.mcts._encode_move(child_move)
             policy[move_idx] = child.visit_count / total_visits
         
-        # Get value from model
-        with torch.no_grad():
-            _, value = self.model(state.unsqueeze(0))
-            value = value.item()
+        # Get value from root node
+        value = self.mcts.root.value()
         
         return state, policy, value
 
@@ -60,9 +84,14 @@ class SelfPlay:
             if board.is_game_over():
                 break
             
-            # Get move from MCTS
-            move = self.mcts.search(board)
+            # Get state representation and move from MCTS
+            state = self._board_to_tensor(board)
+            encoded_state = state.unsqueeze(0)  # Add batch dimension
+            move = self.mcts.search(board, encoded_state)
             
+            if move is None:  # Game is over
+                break
+                
             # Get training data before making the move
             state, policy, value = self._get_training_data(board, move)
             game_data.append((state, policy, value))
